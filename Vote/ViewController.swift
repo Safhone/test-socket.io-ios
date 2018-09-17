@@ -13,69 +13,74 @@ class ViewController: UIViewController {
 
     @IBOutlet weak var statusLabel: UILabel!
     @IBOutlet weak var questionAnswerTableView: UITableView!
-    var dic = [Dictionary<String, String>]()
+    var dic = Dictionary<String, AnyObject>()
     
     var socket = SocketIOClient(socketURL: URL(string: "http://127.0.0.1:9090")!, config:[.log(false), .forceWebsockets(true), .nsp("/vote")])
     
     override func viewDidLoad() {
         super.viewDidLoad()
         
-        fetch()
+        questionAnswerTableView.delegate           = self
+        questionAnswerTableView.dataSource         = self
+        questionAnswerTableView.tableFooterView    = UIView()
+        questionAnswerTableView.estimatedRowHeight = 100
+        questionAnswerTableView.rowHeight          = UITableViewAutomaticDimension
+        questionAnswerTableView.separatorInset     = .zero
         
-        self.questionAnswerTableView.delegate           = self
-        self.questionAnswerTableView.dataSource         = self
-        self.questionAnswerTableView.tableFooterView    = UIView()
-        self.questionAnswerTableView.estimatedRowHeight = 100
-        self.questionAnswerTableView.rowHeight          = UITableViewAutomaticDimension
-        self.questionAnswerTableView.separatorInset     = .zero
+        fetchData()
         
         socket.connect()
         
         socket.on(clientEvent: .connect) { data, ack in
             print("Connected to Socket server")
-            self.statusLabel.text = "Connected"
+            self.statusLabel.text = "Socket server: Connected"
             self.statusLabel.textColor = UIColor.blue
         }
 
         socket.on("disconnect") { data, ack in
             print("Disconnected from Socket server")
-            self.statusLabel.text = "Not Connected"
+            self.statusLabel.text = "Socket server: Not Connected"
             self.statusLabel.textColor = UIColor.red
         }
         
         socket.on("onVote") { (data, ack) in
-            self.dic = data.first as! [Dictionary<String, String>]
+            self.dic = data.first as! [String : AnyObject]
             self.questionAnswerTableView.reloadData()
         }
         
     }
     
-    @objc func voteAction() {
-        let cell = self.questionAnswerTableView.indexPathForSelectedRow
-        print("===============", dic[(cell?.row)!]["answerUUID"]!)
-        let body = [
-            "ANSWER_UUID" : dic[(cell?.row)!]["answerUUID"] ?? ""
-        ]
-        
-        API.shared.fetch(url: "http://localhost:8080/api/insert-vote", body: body as [String : AnyObject], method: "POST") { (response) in
+    @objc private func voteAction() {
+        if let cell = self.questionAnswerTableView.indexPathForSelectedRow {
+            self.tableView(self.questionAnswerTableView, didDeselectRowAt: cell)
+            let answers = dic["answers"] as! NSArray
+            var answer = answers[cell.row] as! Dictionary<String, AnyObject>
+            
+            let body = [
+                "ANSWER_UUID" : answer["answer_uuid"]
+            ] as [String : AnyObject]
+            
+            insertData(body: body)
+        }
+    }
+    
+    private func insertData(body: [String : AnyObject]) {
+        API.shared.fetch(url: "http://localhost:8080/api/insert-vote", body: body) { (response) in
             switch response {
-            case .success(_):
-                self.tableView(self.questionAnswerTableView, didDeselectRowAt: cell!)
+            case .success(_): break
             case .error(_): break
             }
         }
     }
     
-    func fetch() {
-        API.shared.fetch(url: "http://localhost:8080/api/find-question-answer", body: [:], method: "POST") { (response) in
+    private func fetchData() {
+        API.shared.fetch(url: "http://localhost:8080/api/find-question-answer", body: [:]) { (response) in
             switch response {
             case .success(let data):
-                self.dic = data.object(forKey: "data") as! Array<Dictionary<String, String>>
-                
+                self.dic = data.object(forKey: "DATA") as! Dictionary<String, AnyObject>
                 DispatchQueue.main.async {
                     self.questionAnswerTableView.reloadData()
                 }
-                
             case .error(_): break
             }
         }
@@ -91,7 +96,7 @@ extension ViewController: UITableViewDelegate, UITableViewDataSource {
         case 0:
             return 1
         case 1:
-            return dic.count
+            return dic["answers"]!.count
         case 2:
             return 1
         default:
@@ -108,13 +113,15 @@ extension ViewController: UITableViewDelegate, UITableViewDataSource {
         switch indexPath.section {
         case 0:
             let questionCell = tableView.dequeueReusableCell(withIdentifier: "questionCell", for: indexPath) as! QuestionTableViewCell
-            questionCell.questionLabel.text = dic[0]["question"]
+            questionCell.questionLabel.text = dic["question"] as? String
             questionCell.isUserInteractionEnabled = false
             return questionCell
         case 1:
             let answerCell = tableView.dequeueReusableCell(withIdentifier: "answerCell", for: indexPath) as! AnswerTableViewCell
-            answerCell.voteLabel.text = dic[indexPath.row]["countVote"]
-            answerCell.answerLabel.text = dic[indexPath.row]["answer"]
+            let answers = dic["answers"] as! NSArray
+            var answer = answers[indexPath.row] as! Dictionary<String, AnyObject>
+            answerCell.voteLabel.text = answer["count_vote"] as? String
+            answerCell.answerLabel.text = answer["answer"] as? String
             return answerCell
         case 2:
             let voteCell = tableView.dequeueReusableCell(withIdentifier: "voteCell", for: indexPath) as! VoteTableViewCell
@@ -131,22 +138,17 @@ extension ViewController: UITableViewDelegate, UITableViewDataSource {
     }
     
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
-
         if indexPath.section == 1 {
             tableView.cellForRow(at: indexPath)?.accessoryType = .checkmark
         }
-        
     }
     
     func tableView(_ tableView: UITableView, didDeselectRowAt indexPath: IndexPath) {
-        
         if indexPath.section == 1 {
             DispatchQueue.main.async {
                 tableView.cellForRow(at: indexPath)?.accessoryType = .none
             }
-            
         }
-        
     }
     
 }

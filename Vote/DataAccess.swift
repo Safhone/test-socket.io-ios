@@ -6,11 +6,6 @@ public enum ResponseCompletion {
     case error(Error)
 }
 
-public enum Method: String {
-    case get  = "GET"
-    case post = "POST"
-}
-
 public class API {
     
     // MARK: - Singleton
@@ -18,10 +13,9 @@ public class API {
     private init() {}
     
     let defaultSession = URLSession(configuration: .default)
-    // 2
     var dataTask: URLSessionDataTask?
     
-    private func request(urlString: String, body: [String: AnyObject], method: String) -> URLRequest  {
+    private func request(urlString: String, body: [String: AnyObject]) -> URLRequest  {
         let requestBody     = self.printPrettyBody(body: body) ?? ""
         
         guard let url       = URL(string: urlString) else { fatalError("CAN'T CREATE URL") }
@@ -41,9 +35,9 @@ public class API {
     }
     
     
-    func fetch(url: String, body: [String: AnyObject], method: String, completion: @escaping (ResponseCompletion) -> Void) {
-        var urlRequest = request(urlString: url, body: body, method: method)
-//        dataTask =
+    func fetch(url: String, body: [String: AnyObject], completion: @escaping (ResponseCompletion) -> Void) {
+        var urlRequest = request(urlString: url, body: body)
+
             defaultSession.dataTask(with: urlRequest) { data, response, error in
             defer { self.dataTask = nil }
             
@@ -53,7 +47,6 @@ public class API {
                 let response = response as? HTTPURLResponse,
                 response.statusCode == 200 {
                 do {
-                    print(String(data: data, encoding: .utf8))
                     let myData = try self.jsonToDic(data)
                     completion(.success(myData))
                 }catch let er {
@@ -63,9 +56,7 @@ public class API {
             }
         }.resume()
         
-//        dataTask?.resume()
     }
-    
     
 }
 
