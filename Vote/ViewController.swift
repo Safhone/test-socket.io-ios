@@ -24,7 +24,7 @@ class ViewController: UIViewController {
         questionAnswerTableView.dataSource         = self
         questionAnswerTableView.tableFooterView    = UIView()
         questionAnswerTableView.estimatedRowHeight = 100
-        questionAnswerTableView.rowHeight          = UITableViewAutomaticDimension
+        questionAnswerTableView.rowHeight          = UITableView.automaticDimension
         questionAnswerTableView.separatorInset     = .zero
         
         fetchData()
@@ -134,7 +134,7 @@ extension ViewController: UITableViewDelegate, UITableViewDataSource {
     }
     
     func tableView(_ tableView: UITableView, heightForRowAt indexPath: IndexPath) -> CGFloat {
-        return UITableViewAutomaticDimension > 60 ? UITableViewAutomaticDimension : 60
+        return UITableView.automaticDimension > 60 ? UITableView.automaticDimension : 60
     }
     
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
